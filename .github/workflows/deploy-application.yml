@@ -114,7 +114,7 @@ jobs:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: ${{ steps.infra.outputs.ecs_service }}
           cluster: ${{ steps.infra.outputs.ecs_cluster }}
-          wait-for-service-stability: false
+          wait-for-service-stability: true
 
       - name: Get Application URL
         run: |
