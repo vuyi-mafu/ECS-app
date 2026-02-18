@@ -4,7 +4,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return '<h1>Hello. Iam learning Terraform and ECS!!!</h1><p>Your Flask app is running!</p>'
+    return '<h1>Welcome to your ECS Backend</h1><p>Your Flask app is running!</p>'
 
 @app.route('/health')
 def health():
