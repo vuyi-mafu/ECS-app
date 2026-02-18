@@ -1,0 +1,14 @@
+{
+"family": "demo-family",
+"networkMode": "awsvpc",
+"requiresCompatibilities": ["FARGATE"],
+"memory": "512",
+"cpu": "256",
+"executionRoleArn": "arn:aws:iam::686739640894:role/ecsTaskExecutionRole",
+"containerDefinitions": [
+{
+"name": "demo-container",
+"image": "686739640894.dkr.ecr.af-south-1.amazonaws.com/demo-ecr:latest",
+"essential": true
+}]
+}

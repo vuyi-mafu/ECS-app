@@ -1,0 +1,131 @@
+name: Deploy Application (Docker + ECS)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - '.github/workflows/deploy-application.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: af-south-1
+  PROJECT_NAME: demo      # ← Must match infrastructure project_name
+  ENVIRONMENT: dev         # ← Must match infrastructure environment
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy Application
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: GitHubActions-AppDeploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Discover Infrastructure Resources
+        id: infra
+        run: |
+          # ECR Repository
+          ECR_REPO=$(aws ecr describe-repositories \
+            --repository-names ${PROJECT_NAME}-ecr \
+            --query 'repositories[0].repositoryUri' \
+            --output text)
+          
+          ECR_REPO_NAME=$(aws ecr describe-repositories \
+            --repository-names ${PROJECT_NAME}-ecr \
+            --query 'repositories[0].repositoryName' \
+            --output text)
+          
+          # ECS Resources (using naming convention)
+          ECS_CLUSTER="${PROJECT_NAME}-cluster"
+          ECS_SERVICE="${PROJECT_NAME}-service"
+          TASK_FAMILY="${PROJECT_NAME}-family"
+          CONTAINER_NAME="${PROJECT_NAME}-container"
+          
+          # Export as outputs
+          echo "ecr_repo_url=${ECR_REPO}" >> $GITHUB_OUTPUT
+          echo "ecr_repo_name=${ECR_REPO_NAME}" >> $GITHUB_OUTPUT
+          echo "ecs_cluster=${ECS_CLUSTER}" >> $GITHUB_OUTPUT
+          echo "ecs_service=${ECS_SERVICE}" >> $GITHUB_OUTPUT
+          echo "container_name=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "task_family=${TASK_FAMILY}" >> $GITHUB_OUTPUT
+          
+          # Display
+          echo "📦 ECR: ${ECR_REPO}"
+          echo "🚀 Cluster: ${ECS_CLUSTER}"
+          echo "⚙️  Service: ${ECS_SERVICE}"
+          echo "📝 Container: ${CONTAINER_NAME}"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ steps.infra.outputs.ecr_repo_name }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Building image..."
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          
+          echo "Pushing image..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          
+          echo "✅ Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+      - name: Download Current Task Definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ steps.infra.outputs.task_family }} \
+            --query 'taskDefinition' \
+            --output json > task-definition.json
+          
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            task-definition.json > task-definition-clean.json
+
+      - name: Update Task Definition with New Image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition-clean.json
+          container-name: ${{ steps.infra.outputs.container_name }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ steps.infra.outputs.ecr_repo_name }}:${{ github.sha }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ steps.infra.outputs.ecs_service }}
+          cluster: ${{ steps.infra.outputs.ecs_cluster }}
+          wait-for-service-stability: true
+
+      - name: Get Application URL
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names ${PROJECT_NAME}-alb \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)
+          
+          echo "🎉 Deployment successful!"
+          echo "🌐 Application URL: http://${ALB_DNS}"
+          echo ""
+          echo "Test your app:"
+          echo "  curl http://${ALB_DNS}"
+          echo "  curl http://${ALB_DNS}/health"
