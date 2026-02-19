@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'app.py'
-      - 'requirements.txt'
-      - 'Dockerfile'
-      - '.github/workflows/deploy-application.yml'
   workflow_dispatch:
 
 env:
@@ -129,3 +124,4 @@ jobs:
           echo "Test your app:"
           echo "  curl http://${ALB_DNS}"
           echo "  curl http://${ALB_DNS}/health"
+          
