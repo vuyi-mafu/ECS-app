@@ -60,10 +60,10 @@ jobs:
           echo "task_family=${TASK_FAMILY}" >> $GITHUB_OUTPUT
           
           # Display
-          echo "📦 ECR: ${ECR_REPO}"
-          echo "🚀 Cluster: ${ECS_CLUSTER}"
-          echo "⚙️  Service: ${ECS_SERVICE}"
-          echo "📝 Container: ${CONTAINER_NAME}"
+          echo "ECR: ${ECR_REPO}"
+          echo "Cluster: ${ECS_CLUSTER}"
+          echo "Service: ${ECS_SERVICE}"
+          echo "Container: ${CONTAINER_NAME}"
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -83,7 +83,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           
-          echo "✅ Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
       - name: Download Current Task Definition
         run: |
@@ -118,8 +118,8 @@ jobs:
             --query 'LoadBalancers[0].DNSName' \
             --output text)
           
-          echo "🎉 Deployment successful!"
-          echo "🌐 Application URL: http://${ALB_DNS}"
+          echo "Deployment successful!"
+          echo "Application URL: http://${ALB_DNS}"
           echo ""
           echo "Test your app:"
           echo "  curl http://${ALB_DNS}"
