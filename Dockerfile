@@ -1,21 +1,18 @@
 # ================================================================
-# Production Multi-Stage Dockerfile
+# Multi-Stage Dockerfile - Port 80 - Root User
 # ================================================================
 
 # ─────────────────────────────────────
-# Stage 1: Build Dependencies
+# Stage 1: Builder
 # ─────────────────────────────────────
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends gcc && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
@@ -26,28 +23,21 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+# Copy packages from builder
+COPY --from=builder /root/.local /root/.local
 
-# Copy installed packages from builder
-COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+# Copy application
+COPY app.py .
 
-# Copy application code
-COPY --chown=appuser:appuser app.py .
+# Set PATH
+ENV PATH=/root/.local/bin:$PATH
 
-# Set PATH for user packages
-ENV PATH=/home/appuser/.local/bin:$PATH
-
-# Switch to non-root user
-USER appuser
-
-# Expose port
+# Expose port 80
 EXPOSE 80
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:80/health')" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:80/health').read()" || exit 1
 
-# Run application
+# Run as root (needed for port 80)
 CMD ["python", "app.py"]
