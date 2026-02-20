@@ -61,10 +61,10 @@ jobs:
           echo "task_family=${TASK_FAMILY}" >> $GITHUB_OUTPUT
           
           # Display
-          echo "📦 ECR: ${ECR_REPO}"
-          echo "🚀 Cluster: ${ECS_CLUSTER}"
-          echo "⚙️  Service: ${ECS_SERVICE}"
-          echo "📝 Container: ${CONTAINER_NAME}"
+          echo "ECR: ${ECR_REPO}"
+          echo "Cluster: ${ECS_CLUSTER}"
+          echo " Service: ${ECS_SERVICE}"
+          echo " Container: ${CONTAINER_NAME}"
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -119,8 +119,8 @@ jobs:
             --query 'LoadBalancers[0].DNSName' \
             --output text)
           
-          echo "🎉 Deployment successful!"
-          echo "🌐 Application URL: http://${ALB_DNS}"
+          echo "Deployment successful!"
+          echo "Application URL: http://${ALB_DNS}"
           echo ""
           echo "Test your app:"
           echo "  curl http://${ALB_DNS}"
